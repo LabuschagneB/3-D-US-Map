@@ -1,0 +1,11 @@
+import { defineConfig } from 'vite';
+import cesium from 'vite-plugin-cesium';
+
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/3-D-US-Map/' : '/',
+  plugins: [cesium()],
+  server: {
+    port: 5173,
+    open: true,
+  },
+}));

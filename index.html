@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>America 3D Map</title>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+
+    <div id="streetViewPanel" hidden>
+      <div class="sv-toolbar">
+        <span id="svTitle">Street View</span>
+        <div class="sv-actions">
+          <a id="svOpenExternal" href="#" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+          <button
+            id="svFullscreenBtn"
+            type="button"
+            class="sv-icon-btn"
+            title="Full screen"
+            aria-label="Full screen Street View"
+          >
+            <svg id="svExpandIcon" class="sv-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"
+              />
+            </svg>
+            <svg id="svCompressIcon" class="sv-icon" viewBox="0 0 24 24" aria-hidden="true" hidden>
+              <path
+                fill="currentColor"
+                d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"
+              />
+            </svg>
+          </button>
+          <button id="svCloseBtn" type="button" class="secondary">Close</button>
+        </div>
+      </div>
+      <iframe
+        id="streetViewFrame"
+        title="Google Street View"
+        allowfullscreen
+        allow="fullscreen"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+      ></iframe>
+      <div id="svFallback" class="sv-fallback" hidden>
+        <p>Street View couldn’t load in this panel (coverage or browser block).</p>
+        <a id="svFallbackLink" href="#" target="_blank" rel="noopener noreferrer">Open Street View in Google Maps</a>
+      </div>
+    </div>
+
+    <div id="ui">
+      <header class="panel">
+        <h1>America 3D</h1>
+        <p>Satellite globe · states · street view</p>
+      </header>
+
+      <div class="panel controls">
+        <label>
+          Search place
+          <input id="searchInput" type="search" placeholder="City, address, landmark…" />
+        </label>
+        <button id="searchBtn" type="button">Go</button>
+
+        <label>
+          Jump to state
+          <select id="stateSelect">
+            <option value="">All United States</option>
+          </select>
+        </label>
+
+        <div class="row">
+          <button id="usaBtn" type="button">Fit USA</button>
+          <button id="resetBtn" type="button">Reset view</button>
+        </div>
+
+        <button id="streetViewBtn" type="button" class="primary">Street View</button>
+        <p class="hint" id="streetViewHint">Click the button, then click a road on the map.</p>
+
+        <div class="toggle-row">
+          <label class="check">
+            <input id="statesToggle" type="checkbox" checked />
+            State borders
+          </label>
+          <label class="check">
+            <input id="labelsToggle" type="checkbox" checked />
+            State names
+          </label>
+          <label class="check">
+            <input id="citiesToggle" type="checkbox" checked />
+            City &amp; town names
+          </label>
+          <label class="check">
+            <input id="roadsToggle" type="checkbox" checked />
+            Road overlay
+          </label>
+        </div>
+        <div id="status" class="status"></div>
+      </div>
+
+      <div class="panel tips">
+        <strong>Controls</strong>
+        <ul>
+          <li>Scroll / pinch — zoom (continent → street)</li>
+          <li>Drag — pan · Right-drag — tilt/rotate</li>
+          <li>Street View — click a street for ground-level photos</li>
+        </ul>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
