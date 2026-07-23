@@ -34,6 +34,20 @@ npm run build
 npm run preview
 ```
 
+## Deploy
+
+### Vercel
+
+Connect the GitHub repo and deploy. Leave the build command as `npm run build` and output as `dist`. Asset base path is `/` by default.
+
+### GitHub Pages
+
+Build with:
+
+```bash
+VITE_BASE=/3-D-US-Map/ npm run build
+```
+
 ## Tech stack
 
 - Vite + CesiumJS
