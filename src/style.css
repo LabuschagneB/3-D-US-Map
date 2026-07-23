@@ -125,18 +125,38 @@ body.streetview-expanded #ui {
   width: 100%;
   border: 0;
   background: #111;
+  min-height: 0;
 }
 
 .sv-fallback {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 24px;
+  gap: 8px 14px;
+  padding: 8px 14px;
   text-align: center;
-  opacity: 0.9;
+  opacity: 0.95;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  background: rgba(0, 0, 0, 0.55);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sv-fallback[hidden] {
+  display: none !important;
+}
+
+.sv-fallback p {
+  margin: 0;
+}
+
+#streetViewPanel:fullscreen .sv-fallback,
+body.streetview-expanded .sv-fallback {
+  padding: 8px 16px;
+  max-height: 52px;
 }
 
 body.sv-picking #cesiumContainer {
@@ -325,6 +345,186 @@ button.active {
   font-size: 0.8rem;
 }
 
+.section-title {
+  margin: 14px 0 8px;
+  font-size: 0.85rem;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.category-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 3px solid var(--cat, #3d7cff);
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 10px 12px;
+}
+
+.category-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.category-btn.active {
+  outline: 2px solid var(--cat, #7ec8ff);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.find-back {
+  margin-bottom: 10px;
+}
+
+body.finding-place #uiHeader,
+body.finding-place #mainControls,
+body.finding-place #extraControls,
+body.finding-place #tipsPanel {
+  display: none !important;
+}
+
+body.finding-place #findPlaceBackBtn {
+  display: block !important;
+}
+
+#findPlaceBackBtn[hidden] {
+  display: none !important;
+}
+
+body.finding-place #ui {
+  max-height: none;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.toggle-row.subtle {
+  margin-top: 14px;
+  opacity: 0.85;
+}
+
+.place-card {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 12;
+  width: min(320px, calc(100vw - 32px));
+  background: rgba(10, 18, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  padding: 16px 16px 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.place-card-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px !important;
+  height: 32px;
+  padding: 0 !important;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.place-card-type {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.place-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  padding-right: 28px;
+}
+
+.place-ext-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: #9fd0ff;
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.place-ext-link:hover {
+  text-decoration: underline;
+}
+
+.nearby-wrap {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+}
+
+.nearby-title {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.nearby-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.nearby-list li {
+  margin: 0;
+}
+
+.nearby-list button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.nearby-list button:hover,
+.nearby-list button.active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nearby-list .nearby-name {
+  display: block;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.nearby-list .nearby-dist {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
 @media (max-width: 640px) {
   #ui {
     top: auto;
@@ -337,5 +537,17 @@ button.active {
 
   body.streetview-open #ui {
     max-height: 28vh;
+  }
+
+  .place-card {
+    top: auto;
+    bottom: calc(12px + min(42vh, 280px));
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+
+  body.streetview-open .place-card {
+    bottom: 52%;
   }
 }

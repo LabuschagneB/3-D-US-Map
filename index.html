@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>America 3D Map</title>
+    <title>South Carolina 3D Map</title>
   </head>
   <body>
     <div id="cesiumContainer"></div>
@@ -50,61 +50,105 @@
       </div>
     </div>
 
+    <aside id="placeCard" class="place-card" hidden>
+      <button id="placeCardClose" type="button" class="place-card-close" aria-label="Close">×</button>
+      <div class="place-card-type" id="placeCardType"></div>
+      <h2 id="placeCardName">Place</h2>
+      <p id="placeCardMeta" class="hint"></p>
+      <div class="row">
+        <button id="placeDirectionsBtn" type="button" class="primary">Directions</button>
+        <button id="placeStreetViewBtn" type="button" class="secondary">Street View</button>
+      </div>
+      <a id="placeGoogleLink" class="place-ext-link" href="#" target="_blank" rel="noopener noreferrer"
+        >Open in Google Maps</a
+      >
+      <div id="nearbyListWrap" class="nearby-wrap" hidden>
+        <h3 class="nearby-title">Nearby options</h3>
+        <ul id="nearbyList" class="nearby-list"></ul>
+      </div>
+    </aside>
+
     <div id="ui">
-      <header class="panel">
-        <h1>America 3D</h1>
-        <p>Satellite globe · states · street view</p>
+      <header class="panel" id="uiHeader">
+        <h1>South Carolina 3D</h1>
+        <p>Find food, gas, shops &amp; beaches · get directions</p>
       </header>
 
       <div class="panel controls">
-        <label>
-          Search place
-          <input id="searchInput" type="search" placeholder="City, address, landmark…" />
-        </label>
-        <button id="searchBtn" type="button">Go</button>
+        <div id="mainControls">
+          <button id="locateBtn" type="button" class="primary">Use my location</button>
+          <p class="hint">Needed once so we can route from where you are.</p>
 
-        <label>
-          Jump to state
-          <select id="stateSelect">
-            <option value="">All United States</option>
-          </select>
-        </label>
+          <label>
+            Search in SC
+            <input id="searchInput" type="search" placeholder="City, restaurant, beach…" />
+          </label>
+          <button id="searchBtn" type="button">Go</button>
 
-        <div class="row">
-          <button id="usaBtn" type="button">Fit USA</button>
-          <button id="resetBtn" type="button">Reset view</button>
+          <div class="row">
+            <button id="scBtn" type="button">Fit South Carolina</button>
+            <button id="usaBtn" type="button" class="secondary">Fit USA</button>
+          </div>
         </div>
 
-        <button id="streetViewBtn" type="button" class="primary">Street View</button>
-        <p class="hint" id="streetViewHint">Click the button, then click a road on the map.</p>
+        <div id="findPlaceSection">
+          <button id="findPlaceBackBtn" type="button" class="secondary find-back" hidden>← Back</button>
+          <h2 class="section-title">Find a place</h2>
+          <p class="hint" id="findPlaceHint">Tap a type to see what’s nearby, then hit Directions.</p>
+          <div class="category-grid">
+            <button type="button" class="category-btn" data-find="restaurant" style="--cat:#e74c3c">
+              <span class="legend-dot" style="background:#e74c3c"></span> Restaurant
+            </button>
+            <button type="button" class="category-btn" data-find="fuel" style="--cat:#f39c12">
+              <span class="legend-dot" style="background:#f39c12"></span> Gas station
+            </button>
+            <button type="button" class="category-btn" data-find="shop" style="--cat:#9b59b6">
+              <span class="legend-dot" style="background:#9b59b6"></span> Shop
+            </button>
+            <button type="button" class="category-btn" data-find="beach" style="--cat:#3498db">
+              <span class="legend-dot" style="background:#3498db"></span> Beach
+            </button>
+            <button type="button" class="category-btn" data-find="cafe" style="--cat:#1abc9c">
+              <span class="legend-dot" style="background:#1abc9c"></span> Café
+            </button>
+            <button type="button" class="category-btn" data-find="hotel" style="--cat:#2ecc71">
+              <span class="legend-dot" style="background:#2ecc71"></span> Hotel
+            </button>
+          </div>
+        </div>
 
-        <div class="toggle-row">
-          <label class="check">
-            <input id="statesToggle" type="checkbox" checked />
-            State borders
-          </label>
-          <label class="check">
-            <input id="labelsToggle" type="checkbox" checked />
-            State names
-          </label>
-          <label class="check">
-            <input id="citiesToggle" type="checkbox" checked />
-            City &amp; town names
-          </label>
-          <label class="check">
-            <input id="roadsToggle" type="checkbox" checked />
-            Road overlay
-          </label>
+        <div id="extraControls">
+          <button id="streetViewBtn" type="button" class="secondary">Street View mode</button>
+          <p class="hint" id="streetViewHint">Or click a pin on the map for Street View.</p>
+
+          <div class="toggle-row subtle">
+            <label class="check">
+              <input id="statesToggle" type="checkbox" checked />
+              State borders
+            </label>
+            <label class="check">
+              <input id="labelsToggle" type="checkbox" checked />
+              State names
+            </label>
+            <label class="check">
+              <input id="citiesToggle" type="checkbox" checked />
+              City names
+            </label>
+            <label class="check">
+              <input id="roadsToggle" type="checkbox" checked />
+              Road overlay
+            </label>
+          </div>
         </div>
         <div id="status" class="status"></div>
       </div>
 
-      <div class="panel tips">
-        <strong>Controls</strong>
+      <div class="panel tips" id="tipsPanel">
+        <strong>How to get directions</strong>
         <ul>
-          <li>Scroll / pinch — zoom (continent → street)</li>
-          <li>Drag — pan · Right-drag — tilt/rotate</li>
-          <li>Street View — click a street for ground-level photos</li>
+          <li>Tap <em>Restaurant</em>, <em>Shop</em>, <em>Gas station</em>, etc.</li>
+          <li>See the place name on the card</li>
+          <li>Tap <em>Directions</em> (use my location if asked)</li>
         </ul>
       </div>
     </div>
