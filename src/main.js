@@ -1029,9 +1029,74 @@ function pickLatLonFromClick(position) {
   };
 }
 
+function isMobileDrawer() {
+  return window.matchMedia('(max-width: 900px)').matches;
+}
+
+function setMenuOpen(open) {
+  const toggle = document.getElementById('menuToggle');
+  const backdrop = document.getElementById('drawerBackdrop');
+  document.body.classList.toggle('menu-open', open);
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  }
+  if (backdrop) backdrop.hidden = !open;
+  requestAnimationFrame(() => viewer.resize());
+}
+
+function closeMenuIfMobile() {
+  if (isMobileDrawer()) setMenuOpen(false);
+}
+
+function wireMobileChrome() {
+  const toggle = document.getElementById('menuToggle');
+  const backdrop = document.getElementById('drawerBackdrop');
+  const locateFab = document.getElementById('locateFab');
+
+  toggle?.addEventListener('click', () => {
+    const open = !document.body.classList.contains('menu-open');
+    setMenuOpen(open);
+  });
+  backdrop?.addEventListener('click', () => setMenuOpen(false));
+  locateFab?.addEventListener('click', () => {
+    locateUser();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('menu-open')) {
+      setMenuOpen(false);
+    }
+  });
+
+  // Close drawer after primary actions on mobile
+  for (const id of ['usaBtn', 'scBtn', 'locateBtn', 'searchBtn', 'streetViewBtn']) {
+    document.getElementById(id)?.addEventListener('click', () => closeMenuIfMobile());
+  }
+  for (const btn of document.querySelectorAll('[data-find]')) {
+    btn.addEventListener('click', () => closeMenuIfMobile());
+  }
+
+  window.matchMedia('(max-width: 900px)').addEventListener('change', (e) => {
+    if (!e.matches) setMenuOpen(false);
+  });
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service worker registration failed', err);
+    });
+  });
+}
+
 function wireUi(layers) {
   roadLayer = layers.roadLayer;
   placesLayer = layers.placesLayer;
+
+  wireMobileChrome();
+  registerServiceWorker();
 
   document.getElementById('usaBtn').addEventListener('click', flyToUsa);
   document.getElementById('scBtn').addEventListener('click', () => {

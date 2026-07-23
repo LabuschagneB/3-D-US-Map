@@ -106,8 +106,10 @@ body.streetview-expanded #streetViewPanel {
   z-index: 20;
 }
 
-body.streetview-expanded #ui {
-  display: none;
+body.streetview-expanded #ui,
+body.streetview-expanded .fab,
+body.streetview-expanded .drawer-backdrop {
+  display: none !important;
 }
 
 #streetViewPanel:fullscreen {
@@ -172,11 +174,76 @@ body {
   color: #e8eef7;
 }
 
+/* Floating action buttons */
+.fab {
+  position: absolute;
+  z-index: 16;
+  width: 48px !important;
+  height: 48px;
+  padding: 0 !important;
+  border-radius: 14px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 18, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+  color: #f4f7fb;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.fab svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.fab-menu {
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px));
+}
+
+.fab-locate {
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  background: linear-gradient(180deg, #2fce7a, #1a9e56);
+  border-color: transparent;
+}
+
+.fab-menu[aria-expanded='true'] {
+  background: rgba(61, 124, 255, 0.95);
+  border-color: transparent;
+}
+
+.fab-menu[aria-expanded='true'] .icon-burger {
+  display: none;
+}
+
+.fab-menu[aria-expanded='true'] .icon-close {
+  display: block !important;
+}
+
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  background: rgba(0, 0, 0, 0.45);
+  border: 0;
+  padding: 0;
+  width: auto;
+  border-radius: 0;
+}
+
+.drawer-backdrop[hidden] {
+  display: none !important;
+}
+
 #ui {
   position: absolute;
   top: 16px;
   left: 16px;
-  z-index: 10;
+  z-index: 15;
   width: min(340px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow: auto;
@@ -185,6 +252,7 @@ body {
   gap: 12px;
   pointer-events: none;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 #ui > * {
@@ -525,29 +593,142 @@ body.finding-place #ui {
   margin-top: 2px;
 }
 
-@media (max-width: 640px) {
-  #ui {
-    top: auto;
-    bottom: 12px;
-    left: 8px;
-    right: 8px;
-    width: auto;
-    max-height: 42vh;
+/* Desktop: keep floating panel; hide mobile FABs */
+@media (min-width: 901px) {
+  .fab,
+  .drawer-backdrop {
+    display: none !important;
+  }
+}
+
+/* Tablet / phone: slide-out drawer + burger */
+@media (max-width: 900px) {
+  .fab {
+    display: inline-flex;
   }
 
-  body.streetview-open #ui {
-    max-height: 28vh;
+  body.menu-open .fab-locate {
+    display: none;
+  }
+
+  #ui {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: auto;
+    width: min(360px, 88vw);
+    max-height: none;
+    height: 100%;
+    margin: 0;
+    padding: calc(64px + env(safe-area-inset-top, 0px)) 12px
+      calc(16px + env(safe-area-inset-bottom, 0px));
+    gap: 10px;
+    background: rgba(8, 14, 26, 0.96);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 12px 0 40px rgba(0, 0, 0, 0.45);
+    transform: translateX(-105%);
+    transition: transform 0.28s ease;
+    pointer-events: auto;
+    z-index: 15;
+  }
+
+  body.menu-open #ui {
+    transform: translateX(0);
+  }
+
+  #ui .panel {
+    border-radius: 12px;
   }
 
   .place-card {
     top: auto;
-    bottom: calc(12px + min(42vh, 280px));
-    right: 8px;
-    left: 8px;
+    bottom: 0;
+    left: 0;
+    right: 0;
     width: auto;
+    max-height: min(52vh, 420px);
+    overflow: auto;
+    border-radius: 18px 18px 0 0;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 13;
+    -webkit-overflow-scrolling: touch;
   }
 
   body.streetview-open .place-card {
-    bottom: 52%;
+    bottom: 50%;
+    max-height: 40vh;
+  }
+
+  body.streetview-expanded .place-card,
+  body.streetview-expanded .fab {
+    display: none !important;
+  }
+
+  body.menu-open .place-card {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .nearby-list {
+    max-height: 140px;
+  }
+
+  .category-btn {
+    min-height: 44px;
+    font-size: 0.9rem;
+    padding: 12px 14px;
+  }
+
+  button,
+  input[type='search'] {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .sv-toolbar {
+    padding: 10px 12px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  }
+
+  .sv-actions a {
+    display: none;
+  }
+
+  /* Tame Cesium chrome on small screens */
+  .cesium-viewer-bottom,
+  .cesium-viewer-toolbar,
+  .cesium-viewer-animationContainer,
+  .cesium-viewer-timelineContainer,
+  .cesium-viewer-fullscreenContainer {
+    display: none !important;
+  }
+
+  body.finding-place #ui {
+    padding-top: calc(64px + env(safe-area-inset-top, 0px));
+  }
+}
+
+@media (max-width: 480px) {
+  .category-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #ui {
+    width: min(100vw, 100%);
+  }
+}
+
+/* Prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #ui {
+    transition: none;
+  }
+}
+
+/* Installable / standalone PWA safe areas */
+@media (display-mode: standalone) {
+  html,
+  body {
+    background: #0b1220;
   }
 }

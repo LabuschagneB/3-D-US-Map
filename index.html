@@ -2,11 +2,49 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="description" content="South Carolina 3D map — find restaurants, gas, shops, beaches and get directions." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SC 3D Map" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <title>South Carolina 3D Map</title>
   </head>
   <body>
     <div id="cesiumContainer"></div>
+
+    <button
+      id="menuToggle"
+      type="button"
+      class="fab fab-menu"
+      aria-label="Open menu"
+      aria-controls="ui"
+      aria-expanded="false"
+    >
+      <svg class="icon-burger" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" />
+      </svg>
+      <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" hidden>
+        <path
+          fill="currentColor"
+          d="M18.3 5.71 12 12.01 5.7 5.7 4.29 7.11 10.59 13.4 4.29 19.7 5.7 21.11 12 14.82l6.3 6.29 1.41-1.41-6.29-6.3 6.29-6.29z"
+        />
+      </svg>
+    </button>
+
+    <button id="locateFab" type="button" class="fab fab-locate" aria-label="Use my location" title="My location">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"
+        />
+      </svg>
+    </button>
+
+    <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
 
     <div id="streetViewPanel" hidden>
       <div class="sv-toolbar">
@@ -67,7 +105,7 @@
       </div>
     </aside>
 
-    <div id="ui">
+    <div id="ui" class="ui-drawer" role="dialog" aria-label="Map controls">
       <header class="panel" id="uiHeader">
         <h1>South Carolina 3D</h1>
         <p>Find food, gas, shops &amp; beaches · get directions</p>
