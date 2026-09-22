@@ -57,9 +57,17 @@ export const POI_CATEGORIES = {
 
 const OVERPASS_MIRRORS = [
   'https://overpass.openstreetmap.fr/api/interpreter',
-  'https://overpass.osm.ch/api/interpreter',
   'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
 ];
+
+// Mirrors that answer 200 with an empty result set and a sequence number in
+// place of a real timestamp are stale; skip them instead of blanking the map.
+function isUsableResponse(data) {
+  if (!data || !Array.isArray(data.elements)) return false;
+  const base = data.osm3s && data.osm3s.timestamp_osm_base;
+  return typeof base === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(base);
+}
 
 let overpassQueue = Promise.resolve();
 
@@ -142,7 +150,9 @@ async function postOverpassViaProxy(query) {
     signal: AbortSignal.timeout(22000),
   });
   if (!res.ok) throw new Error('Overpass ' + res.status);
-  return await res.json();
+  const data = await res.json();
+  if (!isUsableResponse(data)) throw new Error('Overpass returned stale data');
+  return data;
 }
 
 async function postOverpassDirect(query) {
@@ -154,7 +164,9 @@ async function postOverpassDirect(query) {
         signal: AbortSignal.timeout(16000),
       });
       if (!res.ok) throw new Error('Overpass ' + res.status);
-      return await res.json();
+      const data = await res.json();
+      if (!isUsableResponse(data)) throw new Error('Overpass returned stale data');
+      return data;
     } catch (err) {
       lastErr = err;
     }
