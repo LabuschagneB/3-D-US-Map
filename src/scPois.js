@@ -7,51 +7,50 @@ export const SC_BBOX = {
   east: -78.499,
 };
 
+// Use `nwr` (node + way + relation) everywhere: chains in shopping plazas are
+// usually mapped as building polygons, so a node-only query silently drops
+// about half of them. `out center` gives ways a usable lat/lon.
 export const POI_CATEGORIES = {
   restaurant: {
     label: 'Restaurant',
     color: '#e74c3c',
     letter: 'R',
-    filters: ['node["amenity"="restaurant"]', 'node["amenity"="fast_food"]'],
+    filters: ['nwr["amenity"="restaurant"]', 'nwr["amenity"="fast_food"]'],
   },
   fuel: {
     label: 'Gas station',
     color: '#f39c12',
     letter: 'G',
-    filters: ['node["amenity"="fuel"]'],
+    filters: ['nwr["amenity"="fuel"]'],
   },
   shop: {
     label: 'Shop',
     color: '#9b59b6',
     letter: 'S',
     filters: [
-      'node["shop"="supermarket"]',
-      'node["shop"="convenience"]',
-      'node["shop"="mall"]',
-      'node["shop"="department_store"]',
+      'nwr["shop"="supermarket"]',
+      'nwr["shop"="convenience"]',
+      'nwr["shop"="mall"]',
+      'nwr["shop"="department_store"]',
     ],
   },
   beach: {
     label: 'Beach',
     color: '#3498db',
     letter: 'B',
-    filters: [
-      'node["natural"="beach"]',
-      'way["natural"="beach"]',
-      'node["leisure"="beach_resort"]',
-    ],
+    filters: ['nwr["natural"="beach"]', 'nwr["leisure"="beach_resort"]'],
   },
   cafe: {
     label: 'Cafe',
     color: '#1abc9c',
     letter: 'C',
-    filters: ['node["amenity"="cafe"]'],
+    filters: ['nwr["amenity"="cafe"]'],
   },
   hotel: {
     label: 'Hotel',
     color: '#2ecc71',
     letter: 'H',
-    filters: ['node["tourism"="hotel"]', 'node["tourism"="motel"]'],
+    filters: ['nwr["tourism"="hotel"]', 'nwr["tourism"="motel"]'],
   },
 };
 
@@ -122,7 +121,7 @@ function buildAroundQuery(categories, lat, lon, radiusMeters, limit) {
     const cat = POI_CATEGORIES[key];
     if (!cat) continue;
     for (const f of cat.filters) {
-      const tagged = f.replace(/^(node|way)/, '$1(around:' + radiusMeters + ',' + origin + ')');
+      const tagged = f.replace(/^(nwr|node|way|relation)/, '$1(around:' + radiusMeters + ',' + origin + ')');
       lines.push('  ' + tagged + ';');
     }
   }
@@ -136,7 +135,10 @@ function buildBboxQuery(categories, bbox, limit) {
     const cat = POI_CATEGORIES[key];
     if (!cat) continue;
     for (const f of cat.filters) {
-      const tagged = f.replace(/^(node|way)/, '$1(' + south + ',' + west + ',' + north + ',' + east + ')');
+      const tagged = f.replace(
+        /^(nwr|node|way|relation)/,
+        '$1(' + south + ',' + west + ',' + north + ',' + east + ')',
+      );
       lines.push('  ' + tagged + ';');
     }
   }
@@ -244,7 +246,10 @@ export async function fetchPoisAround(lat, lon, categories, radiusMeters = 20000
  * only when the close-in one comes up short.
  */
 export async function fetchPoisNear(lat, lon, categories, options = {}) {
-  const { radii = [8000, 25000], minResults = 6, limit = 80 } = options;
+  // Overpass `out N` truncates in database order, not by distance, so start
+  // tight enough that the result set is usually complete and the nearest match
+  // is genuinely the nearest.
+  const { radii = [3000, 10000, 25000], minResults = 6, limit = 120 } = options;
   let best = [];
   let lastErr;
 

@@ -513,7 +513,7 @@ function addPoiPins(pois) {
     if (poiDataSource.entities.getById(`poi-${poi.id}`)) continue;
     const entity = poiDataSource.entities.add({
       id: `poi-${poi.id}`,
-      name: poi.name,
+      name: poiDisplayName(poi),
       position: Cesium.Cartesian3.fromDegrees(poi.lon, poi.lat, 40),
       billboard: {
         image: getPinImage(poi.category),
@@ -525,7 +525,7 @@ function addPoiPins(pois) {
         heightReference: Cesium.HeightReference.NONE,
       },
       label: {
-        text: poi.name,
+        text: poiDisplayName(poi),
         font: '600 12px Segoe UI, sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
@@ -651,7 +651,19 @@ function hidePlaceCard() {
   document.getElementById('placeCard').hidden = true;
   document.getElementById('nearbyListWrap').hidden = true;
   document.getElementById('nearbyList').innerHTML = '';
+  const moreBtn = document.getElementById('nearbyMoreBtn');
+  if (moreBtn) moreBtn.hidden = true;
   selectedPoi = null;
+}
+
+const NEARBY_PAGE_SIZE = 8;
+
+// Plenty of OSM entries carry no name, which rendered as a blank row.
+function poiDisplayName(poi) {
+  const name = (poi.name || '').trim();
+  if (name) return name;
+  const label = POI_CATEGORIES[poi.category]?.label;
+  return label ? `Unnamed ${label.toLowerCase()}` : 'Unnamed place';
 }
 
 function showPlaceCard(poi, nearbyPois = []) {
@@ -660,7 +672,7 @@ function showPlaceCard(poi, nearbyPois = []) {
   const meta = POI_CATEGORIES[poi.category];
   document.getElementById('placeCardType').textContent = meta?.label || poi.category;
   document.getElementById('placeCardType').style.color = meta?.color || '#fff';
-  document.getElementById('placeCardName').textContent = poi.name;
+  document.getElementById('placeCardName').textContent = poiDisplayName(poi);
 
   const origin = getOriginForRouting();
   let metaText = `${poi.lat.toFixed(4)}, ${poi.lon.toFixed(4)}`;
@@ -682,37 +694,68 @@ function showPlaceCard(poi, nearbyPois = []) {
 
   const wrap = document.getElementById('nearbyListWrap');
   const list = document.getElementById('nearbyList');
+  const moreBtn = document.getElementById('nearbyMoreBtn');
   list.innerHTML = '';
+
   const options = (nearbyPois.length ? nearbyPois : [poi])
     .map((p) => ({ poi: p, dist: distanceMeters(origin, p) }))
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 8);
+    .sort((a, b) => a.dist - b.dist);
 
-  if (options.length > 1) {
-    wrap.hidden = false;
-    for (const { poi: option, dist } of options) {
-      const li = document.createElement('li');
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = option.id === poi.id ? 'active' : '';
-      btn.innerHTML =
-        `<span class="nearby-name">${option.name}</span>` +
-        `<span class="nearby-dist">${formatDistance(dist)} · ${POI_CATEGORIES[option.category]?.label || ''}</span>`;
-      btn.addEventListener('click', () => {
-        clearRoute();
-        showPlaceCard(option, nearbyPois);
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(option.lon, option.lat, 2200),
-          duration: 1.1,
-        });
-        setStatus(`Selected: ${option.name}. Tap Directions when ready.`);
-      });
-      li.appendChild(btn);
-      list.appendChild(li);
-    }
-  } else {
+  if (options.length <= 1) {
     wrap.hidden = true;
+    if (moreBtn) moreBtn.hidden = true;
+    card.hidden = false;
+    return;
   }
+
+  wrap.hidden = false;
+
+  const renderRow = ({ poi: option, dist }) => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = option.id === poi.id ? 'active' : '';
+
+    // OSM names are user-supplied, so build the row as text nodes.
+    const nameEl = document.createElement('span');
+    nameEl.className = 'nearby-name';
+    nameEl.textContent = poiDisplayName(option);
+
+    const distEl = document.createElement('span');
+    distEl.className = 'nearby-dist';
+    const catLabel = POI_CATEGORIES[option.category]?.label;
+    distEl.textContent = catLabel
+      ? `${formatDistance(dist)} · ${catLabel}`
+      : formatDistance(dist);
+
+    btn.append(nameEl, distEl);
+    btn.addEventListener('click', () => {
+      clearRoute();
+      showPlaceCard(option, nearbyPois);
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(option.lon, option.lat, 2200),
+        duration: 1.1,
+      });
+      setStatus(`Selected: ${poiDisplayName(option)}. Tap Directions when ready.`);
+    });
+    li.appendChild(btn);
+    list.appendChild(li);
+  };
+
+  let shown = 0;
+  const showNext = () => {
+    const next = options.slice(shown, shown + NEARBY_PAGE_SIZE);
+    next.forEach(renderRow);
+    shown += next.length;
+
+    if (!moreBtn) return;
+    const remaining = options.length - shown;
+    moreBtn.hidden = remaining <= 0;
+    moreBtn.textContent = `View ${Math.min(remaining, NEARBY_PAGE_SIZE)} more`;
+  };
+
+  if (moreBtn) moreBtn.onclick = showNext;
+  showNext();
 
   card.hidden = false;
 }
