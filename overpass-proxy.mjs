@@ -17,7 +17,7 @@ function isUsableResponse(data) {
   return typeof base === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(base);
 }
 
-export async function queryOverpass(query, timeoutMs = 15000) {
+export async function queryOverpass(query, timeoutMs = 15000, attempts = []) {
   let lastErr;
   const body = String(query || '').trim();
   if (!body) {
@@ -25,6 +25,7 @@ export async function queryOverpass(query, timeoutMs = 15000) {
   }
 
   for (const url of OVERPASS_MIRRORS) {
+    const host = new URL(url).host;
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -37,16 +38,20 @@ export async function queryOverpass(query, timeoutMs = 15000) {
         signal: AbortSignal.timeout(timeoutMs),
       });
       if (!res.ok) {
-        lastErr = new Error('Overpass ' + res.status + ' from ' + url);
+        attempts.push(host + ': HTTP ' + res.status);
+        lastErr = new Error('Overpass ' + res.status + ' from ' + host);
         continue;
       }
       const data = await res.json();
       if (!isUsableResponse(data)) {
-        lastErr = new Error('Overpass returned stale data from ' + url);
+        attempts.push(host + ': stale response');
+        lastErr = new Error('Overpass returned stale data from ' + host);
         continue;
       }
+      attempts.push(host + ': ok');
       return data;
     } catch (err) {
+      attempts.push(host + ': ' + (err && err.name ? err.name : 'error'));
       lastErr = err;
     }
   }

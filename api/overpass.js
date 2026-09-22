@@ -1,46 +1,49 @@
-import { queryOverpass } from '../overpass-proxy.mjs';
+import { OVERPASS_MIRRORS, queryOverpass } from '../overpass-proxy.mjs';
 
-export const config = { runtime: 'edge' };
+export const config = { runtime: 'nodejs', maxDuration: 30 };
 
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Accept',
-  };
+function setCors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
 }
 
-export default async function handler(request) {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders() });
+async function readBody(req) {
+  if (typeof req.body === 'string') return req.body;
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+export default async function handler(req, res) {
+  setCors(res);
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
   }
 
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'POST only' }), {
-      status: 405,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-    });
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'POST only' });
+    return;
   }
 
-  const query = (await request.text()).trim();
+  const query = (await readBody(req)).trim();
   if (!query) {
-    return new Response(JSON.stringify({ error: 'Missing query' }), {
-      status: 400,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-    });
+    res.status(400).json({ error: 'Missing query' });
+    return;
   }
 
+  const attempts = [];
   try {
-    const data = await queryOverpass(query);
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-    });
+    const data = await queryOverpass(query, 12000, attempts);
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=86400');
+    res.status(200).json(data);
   } catch (err) {
-    const message = err && err.message ? err.message : 'Overpass unavailable';
-    return new Response(JSON.stringify({ error: message }), {
-      status: 504,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+    res.status(504).json({
+      error: err && err.message ? err.message : 'Overpass unavailable',
+      mirrors: OVERPASS_MIRRORS.length,
+      attempts,
     });
   }
 }

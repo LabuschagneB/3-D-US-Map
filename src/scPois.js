@@ -55,12 +55,6 @@ export const POI_CATEGORIES = {
   },
 };
 
-const OVERPASS_MIRRORS = [
-  'https://overpass.openstreetmap.fr/api/interpreter',
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
-
 // Mirrors that answer 200 with an empty result set and a sequence number in
 // place of a real timestamp are stale; skip them instead of blanking the map.
 function isUsableResponse(data) {
@@ -155,33 +149,11 @@ async function postOverpassViaProxy(query) {
   return data;
 }
 
-async function postOverpassDirect(query) {
-  let lastErr;
-  for (const url of OVERPASS_MIRRORS) {
-    try {
-      const res = await fetch(url + '?data=' + encodeURIComponent(query), {
-        method: 'GET',
-        signal: AbortSignal.timeout(16000),
-      });
-      if (!res.ok) throw new Error('Overpass ' + res.status);
-      const data = await res.json();
-      if (!isUsableResponse(data)) throw new Error('Overpass returned stale data');
-      return data;
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr || new Error('Overpass failed');
-}
-
+// Overpass mirrors send no CORS headers and reject browser origins outright,
+// so every request goes through the same-origin proxy. When that fails the
+// caller falls back to the curated place list.
 async function postOverpass(query) {
-  return enqueueOverpass(async () => {
-    try {
-      return await postOverpassViaProxy(query);
-    } catch {
-      return await postOverpassDirect(query);
-    }
-  });
+  return enqueueOverpass(() => postOverpassViaProxy(query));
 }
 
 function elementToPoi(el, category) {
