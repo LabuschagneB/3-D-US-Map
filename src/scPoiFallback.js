@@ -56,3 +56,11 @@ export function fallbackPoisForCategories(categories) {
   const set = new Set(categories);
   return SC_FALLBACK_POIS.filter((p) => set.has(p.category));
 }
+
+/**
+ * The curated list only covers South Carolina, so it is useful as an offline
+ * safety net near SC and pure noise anywhere else on the globe.
+ */
+export function isNearSouthCarolina(lat, lon) {
+  return lat >= 31.0 && lat <= 36.3 && lon >= -84.4 && lon <= -77.5;
+}

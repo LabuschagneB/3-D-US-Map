@@ -109,17 +109,24 @@ export function pinSvgDataUri(color, letter) {
   return 'data:image/svg+xml,' + encodeURIComponent(svg);
 }
 
+// Snap to ~1km so panning a little reuses the cached proxy response instead of
+// issuing a fresh Overpass query for every pixel of movement.
+function snapCoord(value) {
+  return Math.round(value * 100) / 100;
+}
+
 function buildAroundQuery(categories, lat, lon, radiusMeters, limit) {
+  const origin = snapCoord(lat) + ',' + snapCoord(lon);
   const lines = [];
   for (const key of categories) {
     const cat = POI_CATEGORIES[key];
     if (!cat) continue;
     for (const f of cat.filters) {
-      const tagged = f.replace(/^(node|way)/, '$1(around:' + radiusMeters + ',' + lat + ',' + lon + ')');
+      const tagged = f.replace(/^(node|way)/, '$1(around:' + radiusMeters + ',' + origin + ')');
       lines.push('  ' + tagged + ';');
     }
   }
-  return '[out:json][timeout:25];\n(\n' + lines.join('\n') + '\n);\nout center ' + limit + ';';
+  return '[out:json][timeout:20];\n(\n' + lines.join('\n') + '\n);\nout center ' + limit + ';';
 }
 
 function buildBboxQuery(categories, bbox, limit) {
@@ -160,7 +167,6 @@ function elementToPoi(el, category) {
   const lat = el.lat != null ? el.lat : el.center && el.center.lat;
   const lon = el.lon != null ? el.lon : el.center && el.center.lon;
   if (lat == null || lon == null) return null;
-  if (!isInSouthCarolina(lat, lon)) return null;
   const tags = el.tags || {};
   const name =
     tags.name ||
@@ -220,9 +226,9 @@ export async function fetchPoisAround(lat, lon, categories, radiusMeters = 20000
   return out;
 }
 
-export async function fetchPoisInSouthCarolina(categories, limit = 150) {
+export async function fetchPoisInBbox(categories, bbox, limit = 150) {
   if (!categories.length) return [];
-  const query = buildBboxQuery(categories, SC_BBOX, limit);
+  const query = buildBboxQuery(categories, bbox, limit);
   const data = await postOverpass(query);
   const out = [];
   const seen = new Set();

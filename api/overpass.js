@@ -1,4 +1,4 @@
-import { OVERPASS_MIRRORS, queryOverpass } from '../overpass-proxy.mjs';
+import { queryOverpass } from '../overpass-proxy.mjs';
 
 export const config = { runtime: 'nodejs', maxDuration: 30 };
 
@@ -36,13 +36,15 @@ export default async function handler(req, res) {
 
   const attempts = [];
   try {
-    const data = await queryOverpass(query, 12000, attempts);
-    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=86400');
+    const data = await queryOverpass(query, { attempts });
+    // Overpass data changes slowly; a long shared cache keeps repeat lookups
+    // off the rate-limited mirrors entirely.
+    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=604800');
     res.status(200).json(data);
   } catch (err) {
+    console.error('Overpass proxy failed', attempts);
     res.status(504).json({
       error: err && err.message ? err.message : 'Overpass unavailable',
-      mirrors: OVERPASS_MIRRORS.length,
       attempts,
     });
   }

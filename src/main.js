@@ -6,15 +6,13 @@ import {
   POI_CATEGORIES,
   distanceMeters,
   fetchPoisAround,
-  fetchPoisInSouthCarolina,
   fetchRoute,
   formatDistance,
   formatDuration,
   googleDirectionsUrl,
-  isInSouthCarolina,
   pinSvgDataUri,
 } from './scPois.js';
-import { fallbackPoisForCategories } from './scPoiFallback.js';
+import { fallbackPoisForCategories, isNearSouthCarolina } from './scPoiFallback.js';
 
 // Contiguous US framing
 const USA_RECTANGLE = Cesium.Rectangle.fromDegrees(-125.0, 24.0, -66.0, 49.5);
@@ -24,8 +22,7 @@ const SC_RECTANGLE = Cesium.Rectangle.fromDegrees(
   SC_BBOX.east,
   SC_BBOX.north,
 );
-// Full US clip — hides the rest of the world
-const AMERICA_LIMIT = Cesium.Rectangle.fromDegrees(-179.2, 17.5, -64.5, 71.5);
+const WORLD_RECTANGLE = Cesium.Rectangle.fromDegrees(-170.0, -60.0, 170.0, 75.0);
 const STATES_URL =
   'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json';
 
@@ -105,47 +102,18 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
 viewer.scene.globe.depthTestAgainstTerrain = false;
 viewer.scene.globe.enableLighting = true;
 viewer.scene.globe.atmosphereLightIntensity = 10;
-viewer.scene.globe.cartographicLimitRectangle = AMERICA_LIMIT;
 viewer.scene.globe.showSkirts = true;
 viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0b1220');
 viewer.scene.fog.enabled = true;
-viewer.scene.skyAtmosphere.show = false;
+viewer.scene.skyAtmosphere.show = true;
 viewer.scene.skyBox.show = false;
 viewer.scene.sun.show = false;
 viewer.scene.moon.show = false;
 viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0b1220');
 viewer.scene.screenSpaceCameraController.minimumZoomDistance = 40;
-viewer.scene.screenSpaceCameraController.maximumZoomDistance = 9_000_000;
+// Far enough out to see the whole globe.
+viewer.scene.screenSpaceCameraController.maximumZoomDistance = 30_000_000;
 viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
-
-function clampCameraToAmerica() {
-  const rect = AMERICA_LIMIT;
-  const camera = viewer.camera;
-  const carto = camera.positionCartographic;
-  if (!carto) return;
-
-  const lon = Cesium.Math.clamp(carto.longitude, rect.west, rect.east);
-  const lat = Cesium.Math.clamp(carto.latitude, rect.south, rect.north);
-  const maxHeight = viewer.scene.screenSpaceCameraController.maximumZoomDistance;
-  const height = Cesium.Math.clamp(carto.height, 40, maxHeight);
-
-  if (
-    lon !== carto.longitude ||
-    lat !== carto.latitude ||
-    height !== carto.height
-  ) {
-    camera.setView({
-      destination: Cesium.Cartesian3.fromRadians(lon, lat, height),
-      orientation: {
-        heading: camera.heading,
-        pitch: camera.pitch,
-        roll: camera.roll,
-      },
-    });
-  }
-}
-
-viewer.camera.changed.addEventListener(clampCameraToAmerica);
 viewer.camera.percentageChanged = 0.01;
 
 async function setupImagery() {
@@ -191,8 +159,17 @@ function flyToSouthCarolina(duration = 1.6) {
   }
 }
 
-// Always start on South Carolina (instant, before async data loads)
-flyToSouthCarolina(0);
+function flyToWorld(duration = 1.6) {
+  const opts = { destination: WORLD_RECTANGLE };
+  if (duration <= 0) {
+    viewer.camera.setView(opts);
+  } else {
+    viewer.camera.flyTo({ ...opts, duration });
+  }
+}
+
+// Frame the globe immediately; geolocation moves us in once the user allows it.
+flyToWorld(0);
 
 function setStatus(text) {
   const el = document.getElementById('status');
@@ -200,14 +177,10 @@ function setStatus(text) {
 }
 
 async function geocode(query) {
-  const q = /south carolina|\bsc\b/i.test(query)
-    ? query
-    : `${query}, South Carolina`;
   const url = new URL('https://nominatim.openstreetmap.org/search');
   url.searchParams.set('format', 'json');
   url.searchParams.set('limit', '1');
-  url.searchParams.set('countrycodes', 'us');
-  url.searchParams.set('q', q);
+  url.searchParams.set('q', query);
 
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
@@ -501,17 +474,33 @@ function findNearestPoi(pois, origin) {
   return best;
 }
 
+// Curated pins exist so the map is never empty offline, but they only cover
+// South Carolina. Showing Charleston while the user stands in Myrtle Beach (or
+// Johannesburg) reads as "these are near you", so keep them close to the user.
+const FALLBACK_RADIUS_METERS = 40000;
+
+function nearbyFallbackPois(categories, origin) {
+  if (!origin || !isNearSouthCarolina(origin.lat, origin.lon)) return [];
+  return fallbackPoisForCategories(categories).filter(
+    (p) => distanceMeters(origin, p) <= FALLBACK_RADIUS_METERS,
+  );
+}
+
 async function collectCategoryPois(category, origin) {
-  const fallback = fallbackPoisForCategories([category]);
   let live = [];
+  let liveFailed = false;
   try {
-    live = await fetchPoisAround(origin.lat, origin.lon, [category], 35000, 100);
+    live = await fetchPoisAround(origin.lat, origin.lon, [category], 25000, 80);
   } catch (err) {
+    liveFailed = true;
     console.warn('Live places unavailable for', category, err);
   }
+
   const byId = new Map();
-  for (const p of [...fallback, ...live]) byId.set(p.id, p);
-  return [...byId.values()];
+  for (const p of [...nearbyFallbackPois([category], origin), ...live]) {
+    byId.set(p.id, p);
+  }
+  return { pois: [...byId.values()], liveFailed };
 }
 
 function clearPois() {
@@ -563,27 +552,30 @@ async function loadPoisNear(lat, lon, radiusMeters = 22000) {
   }
   if (poiLoading) return;
   poiLoading = true;
-  setStatus('Loading places near you in South Carolina…');
+  setStatus('Loading places near you…');
   try {
     clearPois();
-    const fallback = fallbackPoisForCategories(categories).filter(
-      (p) => distanceMeters({ lat, lon }, p) <= Math.max(radiusMeters, 80000),
-    );
-    addPoiPins(fallback);
+    addPoiPins(nearbyFallbackPois(categories, { lat, lon }));
 
+    let liveFailed = false;
     try {
-      const pois = await fetchPoisAround(lat, lon, categories, radiusMeters, 140);
+      const pois = await fetchPoisAround(lat, lon, categories, radiusMeters, 120);
       addPoiPins(pois);
     } catch (liveErr) {
-      console.warn('Live POI fetch failed, using curated places', liveErr);
+      liveFailed = true;
+      console.warn('Live POI fetch failed', liveErr);
     }
 
     const count = poiDataSource.entities.values.length;
-    setStatus(
-      count
-        ? `Showing ${count} places. Click a pin for directions.`
-        : 'No places found nearby for the selected types.',
-    );
+    if (count) {
+      setStatus(`Showing ${count} places. Click a pin for directions.`);
+    } else {
+      setStatus(
+        liveFailed
+          ? 'Place search is unavailable right now. Try again shortly.'
+          : 'No places found nearby for the selected types.',
+      );
+    }
   } catch (err) {
     console.error(err);
     setStatus('Could not load places. Try again in a moment.');
@@ -596,46 +588,13 @@ async function loadPoisForMapCenter() {
   const carto = viewer.camera.positionCartographic;
   const lat = Cesium.Math.toDegrees(carto.latitude);
   const lon = Cesium.Math.toDegrees(carto.longitude);
-  if (!isInSouthCarolina(lat, lon)) {
-    setStatus('Pan into South Carolina, then load places.');
-    flyToSouthCarolina();
+  // Overpass around-queries only make sense once the camera is close enough
+  // that "nearby" means something.
+  if (carto.height > 400000) {
+    setStatus('Zoom in to a city or town, then load places.');
     return;
   }
   await loadPoisNear(lat, lon, 28000);
-}
-
-async function loadStatewideSample() {
-  const categories = getEnabledCategories();
-  if (!categories.length) {
-    clearPois();
-    return;
-  }
-  setStatus('Loading South Carolina places…');
-  try {
-    clearPois();
-    addPoiPins(fallbackPoisForCategories(categories));
-    const baseCount = poiDataSource.entities.values.length;
-    setStatus(`Showing ${baseCount} South Carolina places. Zoom in or use my location for more.`);
-
-    try {
-      const beachOnly = categories.filter((c) => c === 'beach');
-      const others = categories.filter((c) => c !== 'beach');
-      if (beachOnly.length) {
-        addPoiPins(await fetchPoisInSouthCarolina(beachOnly, 60));
-      }
-      if (others.length) {
-        addPoiPins(await fetchPoisInSouthCarolina(others, 80));
-      }
-      const total = poiDataSource.entities.values.length;
-      setStatus(`Showing ${total} places in SC. Click a pin for details & directions.`);
-    } catch (liveErr) {
-      console.warn('Overpass enrichment skipped', liveErr);
-    }
-  } catch (err) {
-    console.error(err);
-    addPoiPins(fallbackPoisForCategories(categories));
-    setStatus(`Showing ${poiDataSource.entities.values.length} curated SC places.`);
-  }
 }
 
 function setUserLocation(lat, lon) {
@@ -678,9 +637,6 @@ function locateUser() {
         destination: Cesium.Cartesian3.fromDegrees(lon, lat, 12000),
         duration: 1.5,
       });
-      if (!isInSouthCarolina(lat, lon)) {
-        setStatus('You appear outside SC — still showing nearby pins if any fall in SC.');
-      }
       await loadPoisNear(lat, lon, 25000);
     },
     (err) => {
@@ -719,7 +675,7 @@ function showPlaceCard(poi, nearbyPois = []) {
     gLink.href = googleDirectionsUrl(userLocation, poi);
     gLink.textContent = 'Open directions in Google Maps';
   } else {
-    gLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' South Carolina')}`;
+    gLink.href = `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lon}`;
     gLink.textContent = 'Open in Google Maps';
   }
 
@@ -771,7 +727,7 @@ async function findCategoryAndRoute(category) {
   }
 
   const label = POI_CATEGORIES[category]?.label || category;
-  setStatus(`Finding ${label.toLowerCase()}s in South Carolina…`);
+  setStatus(`Finding ${label.toLowerCase()}s near you…`);
 
   if (!userLocation && navigator.geolocation) {
     await new Promise((resolve) => {
@@ -787,7 +743,7 @@ async function findCategoryAndRoute(category) {
   }
 
   const origin = getOriginForRouting();
-  const pois = await collectCategoryPois(category, origin);
+  const { pois, liveFailed } = await collectCategoryPois(category, origin);
   clearPois();
   clearRoute();
   addPoiPins(pois);
@@ -799,7 +755,11 @@ async function findCategoryAndRoute(category) {
 
   if (!nearest) {
     hidePlaceCard();
-    setStatus(`No ${label.toLowerCase()} found nearby in South Carolina.`);
+    setStatus(
+      liveFailed
+        ? `Place search is unavailable right now — could not load ${label.toLowerCase()}s. Try again shortly.`
+        : `No ${label.toLowerCase()} found within ${formatDistance(25000)} of you.`,
+    );
     return;
   }
 
@@ -1099,6 +1059,10 @@ function wireUi(layers) {
   registerServiceWorker();
 
   document.getElementById('usaBtn').addEventListener('click', flyToUsa);
+  document.getElementById('worldBtn')?.addEventListener('click', () => {
+    closeStreetView();
+    flyToWorld();
+  });
   document.getElementById('scBtn').addEventListener('click', () => {
     closeStreetView();
     flyToSouthCarolina();
@@ -1116,8 +1080,6 @@ function wireUi(layers) {
 
   document.getElementById('findPlaceBackBtn')?.addEventListener('click', () => {
     exitFindPlaceMode();
-    flyToSouthCarolina();
-    loadStatewideSample();
   });
 
   document.getElementById('placeCardClose').addEventListener('click', () => {
@@ -1148,7 +1110,7 @@ function wireUi(layers) {
     const q = document.getElementById('searchInput').value.trim();
     if (!q) return;
     try {
-      setStatus(`Searching “${q}” in South Carolina…`);
+      setStatus(`Searching “${q}”…`);
       const hit = await geocode(q);
       viewer.camera.flyTo({
         destination: Cesium.Cartesian3.fromDegrees(hit.lon, hit.lat, 2500),
@@ -1225,12 +1187,10 @@ async function main() {
   try {
     const layers = await setupImagery();
     wireUi(layers);
-    flyToSouthCarolina(0);
-    setStatus('Loading South Carolina…');
+    setStatus('Loading map…');
     await loadStates();
     loadCities();
-    await loadStatewideSample();
-    setStatus('Ready — tap Gas station, Restaurant, Beach, etc. for directions to the nearest one.');
+    setStatus('Ready — tap “Use my location”, then pick a place type for directions.');
   } catch (err) {
     console.error(err);
     setStatus(err.message || 'Failed to start map');
