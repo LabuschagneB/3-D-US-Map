@@ -55,10 +55,22 @@ export const POI_CATEGORIES = {
   },
 };
 
-const OVERPASS_URLS = [
+const OVERPASS_MIRRORS = [
+  'https://overpass.openstreetmap.fr/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter',
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
 ];
+
+let overpassQueue = Promise.resolve();
+
+function enqueueOverpass(task) {
+  const run = overpassQueue.then(task, task);
+  overpassQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 export function isInSouthCarolina(lat, lon) {
   return (
@@ -105,7 +117,7 @@ function buildAroundQuery(categories, lat, lon, radiusMeters, limit) {
       lines.push('  ' + tagged + ';');
     }
   }
-  return '[out:json][timeout:50];\n(\n' + lines.join('\n') + '\n);\nout center ' + limit + ';';
+  return '[out:json][timeout:25];\n(\n' + lines.join('\n') + '\n);\nout center ' + limit + ';';
 }
 
 function buildBboxQuery(categories, bbox, limit) {
@@ -119,17 +131,27 @@ function buildBboxQuery(categories, bbox, limit) {
       lines.push('  ' + tagged + ';');
     }
   }
-  return '[out:json][timeout:60];\n(\n' + lines.join('\n') + '\n);\nout center ' + limit + ';';
+  return '[out:json][timeout:25];\n(\n' + lines.join('\n') + '\n);\nout center ' + limit + ';';
 }
 
-async function postOverpass(query) {
+async function postOverpassViaProxy(query) {
+  const res = await fetch('/api/overpass', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    body: query,
+    signal: AbortSignal.timeout(22000),
+  });
+  if (!res.ok) throw new Error('Overpass ' + res.status);
+  return await res.json();
+}
+
+async function postOverpassDirect(query) {
   let lastErr;
-  for (const url of OVERPASS_URLS) {
+  for (const url of OVERPASS_MIRRORS) {
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        body: 'data=' + encodeURIComponent(query),
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      const res = await fetch(url + '?data=' + encodeURIComponent(query), {
+        method: 'GET',
+        signal: AbortSignal.timeout(16000),
       });
       if (!res.ok) throw new Error('Overpass ' + res.status);
       return await res.json();
@@ -138,6 +160,16 @@ async function postOverpass(query) {
     }
   }
   throw lastErr || new Error('Overpass failed');
+}
+
+async function postOverpass(query) {
+  return enqueueOverpass(async () => {
+    try {
+      return await postOverpassViaProxy(query);
+    } catch {
+      return await postOverpassDirect(query);
+    }
+  });
 }
 
 function elementToPoi(el, category) {
