@@ -169,8 +169,25 @@ function flyToWorld(duration = 1.6) {
   }
 }
 
-// Frame the globe immediately; geolocation moves us in once the user allows it.
-flyToWorld(0);
+// Open on a globe turned to the Americas rather than a world-centred view,
+// which lands on the Atlantic. Geolocation moves us in once the user allows it.
+function flyToHome(duration = 1.6) {
+  const opts = {
+    destination: Cesium.Cartesian3.fromDegrees(-90.0, 22.0, 16_000_000),
+    orientation: {
+      heading: 0.0,
+      pitch: Cesium.Math.toRadians(-90.0),
+      roll: 0.0,
+    },
+  };
+  if (duration <= 0) {
+    viewer.camera.setView(opts);
+  } else {
+    viewer.camera.flyTo({ ...opts, duration });
+  }
+}
+
+flyToHome(0);
 
 function setStatus(text) {
   const el = document.getElementById('status');
@@ -246,7 +263,6 @@ function featureRectangle(feature) {
   return Cesium.Rectangle.fromDegrees(west, south, east, north);
 }
 
-let stateDataSource = null;
 const labelDataSource = new Cesium.CustomDataSource('state-labels');
 const cityDataSource = new Cesium.CustomDataSource('city-labels');
 viewer.dataSources.add(labelDataSource);
@@ -348,21 +364,13 @@ function addPlaceLabel(dataSource, id, text, lon, lat, options = {}) {
   });
 }
 
-function geometryRings(geom) {
-  if (geom.type === 'Polygon') return [geom.coordinates[0]];
-  if (geom.type === 'MultiPolygon') return geom.coordinates.map((poly) => poly[0]);
-  return [];
-}
-
+// The state GeoJSON is still the source for state name labels and the state
+// picker; only the border outlines were dropped.
 async function loadStates() {
   const res = await fetch(STATES_URL);
   if (!res.ok) throw new Error('Could not load state boundaries');
   const geojson = await res.json();
   const select = document.getElementById('stateSelect');
-
-  // Polygon outlines are unreliable in Cesium on many GPUs — use red polylines instead
-  stateDataSource = new Cesium.CustomDataSource('states');
-  viewer.dataSources.add(stateDataSource);
 
   const sorted = [...geojson.features].sort((a, b) =>
     String(a.properties.name).localeCompare(String(b.properties.name)),
@@ -379,25 +387,6 @@ async function loadStates() {
     opt.value = name;
     opt.textContent = `${name} (${meta.abbr})`;
     if (select) select.appendChild(opt);
-
-    const rings = geometryRings(feature.geometry);
-    rings.forEach((ring, ringIndex) => {
-      const positions = ring.map(([lon, lat]) =>
-        Cesium.Cartesian3.fromDegrees(lon, lat),
-      );
-      stateDataSource.entities.add({
-        id: `border-${meta.abbr}-${ringIndex}`,
-        name,
-        polyline: {
-          positions,
-          width: 4,
-          material: Cesium.Color.RED,
-          clampToGround: true,
-          arcType: Cesium.ArcType.GEODESIC,
-          zIndex: 20,
-        },
-      });
-    });
 
     addPlaceLabel(labelDataSource, `label-${meta.abbr}-${name}`, name, center.lon, center.lat, {
       font: '700 18px Segoe UI, sans-serif',
@@ -1135,9 +1124,6 @@ function wireUi(layers) {
     openStreetView(selectedPoi.lat, selectedPoi.lon);
   });
 
-  document.getElementById('statesToggle').addEventListener('change', (e) => {
-    if (stateDataSource) stateDataSource.show = e.target.checked;
-  });
   document.getElementById('labelsToggle').addEventListener('change', (e) => {
     labelDataSource.show = e.target.checked;
   });
