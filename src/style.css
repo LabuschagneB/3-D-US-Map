@@ -95,6 +95,12 @@ body.streetview-open #streetViewPanel {
   display: block;
 }
 
+/* `display: block` above outranks the UA rule for [hidden], which would
+   otherwise leave the expand and collapse icons visible at the same time. */
+.sv-icon[hidden] {
+  display: none;
+}
+
 body.streetview-expanded #cesiumContainer {
   height: 0 !important;
   visibility: hidden;
