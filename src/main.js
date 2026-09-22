@@ -6,6 +6,7 @@ import {
   POI_CATEGORIES,
   distanceMeters,
   fetchPoisAround,
+  fetchPoisNear,
   fetchRoute,
   formatDistance,
   formatDuration,
@@ -490,7 +491,7 @@ async function collectCategoryPois(category, origin) {
   let live = [];
   let liveFailed = false;
   try {
-    live = await fetchPoisAround(origin.lat, origin.lon, [category], 25000, 80);
+    live = await fetchPoisNear(origin.lat, origin.lon, [category]);
   } catch (err) {
     liveFailed = true;
     console.warn('Live places unavailable for', category, err);

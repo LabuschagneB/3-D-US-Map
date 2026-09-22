@@ -156,11 +156,23 @@ async function postOverpassViaProxy(query) {
   return data;
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Overpass mirrors send no CORS headers and reject browser origins outright,
 // so every request goes through the same-origin proxy. When that fails the
 // caller falls back to the curated place list.
+//
+// Every mirror can be rate-limited at the same moment, which usually clears
+// within a second or two, so one retry recovers most of those windows.
 async function postOverpass(query) {
-  return enqueueOverpass(() => postOverpassViaProxy(query));
+  return enqueueOverpass(async () => {
+    try {
+      return await postOverpassViaProxy(query);
+    } catch {
+      await sleep(1500);
+      return postOverpassViaProxy(query);
+    }
+  });
 }
 
 function elementToPoi(el, category) {
@@ -224,6 +236,30 @@ export async function fetchPoisAround(lat, lon, categories, radiusMeters = 20000
     out.push(poi);
   }
   return out;
+}
+
+/**
+ * Widening search. A tight radius answers fast in dense cities and keeps
+ * "nearest" meaningful; rural areas fall through to the wider, costlier query
+ * only when the close-in one comes up short.
+ */
+export async function fetchPoisNear(lat, lon, categories, options = {}) {
+  const { radii = [8000, 25000], minResults = 6, limit = 80 } = options;
+  let best = [];
+  let lastErr;
+
+  for (const radius of radii) {
+    try {
+      const pois = await fetchPoisAround(lat, lon, categories, radius, limit);
+      if (pois.length >= minResults) return pois;
+      if (pois.length > best.length) best = pois;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  if (best.length || !lastErr) return best;
+  throw lastErr;
 }
 
 export async function fetchPoisInBbox(categories, bbox, limit = 150) {
